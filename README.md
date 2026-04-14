@@ -1,43 +1,43 @@
 # TestLink Venko
 
-Fork customizado do [TestLink Open Source](https://github.com/TestLinkOpenSourceTRMS/testlink-code) com adaptaes da Venko, rodando via Docker.
+Fork customizado do [TestLink Open Source](https://github.com/TestLinkOpenSourceTRMS/testlink-code) com adaptacoes da Venko, rodando via Docker.
 
 ---
 
-## ndice
+## Indice
 
-1. [Instalao (testlink-venko com Docker)](#1-instalao-testlink-venko-com-docker)
-2. [Introduo](#2-introduo)
-3. [Notas de Release / Configuraes Crticas](#3-notas-de-release--configuraes-crticas)
+1. [Instalacao (testlink-venko com Docker)](#1-instalacao-testlink-venko-com-docker)
+2. [Introducao](#2-introducao)
+3. [Notas de Release / Configuracoes Criticas](#3-notas-de-release--configuracoes-criticas)
 4. [Requisitos do Sistema](#4-requisitos-do-sistema)
-5. [Upgrade e Migrao](#5-upgrade-e-migrao)
+5. [Upgrade e Migracao](#5-upgrade-e-migracao)
 6. [Equipe TestLink](#6-equipe-testlink)
 7. [Bugs, Reports e Feedback](#7-bugs-reports-e-feedback)
-8. [Mudanas](#8-mudanas)
+8. [Mudancas](#8-mudancas)
 
 ---
 
-## 1. Instalao (testlink-venko com Docker)
+## 1. Instalacao (testlink-venko com Docker)
 
-Este projeto utiliza **Docker** e **Docker Compose** para facilitar a instalao em qualquer mquina.
+Este projeto utiliza **Docker** e **Docker Compose** para facilitar a instalacao em qualquer maquina.
 
-### Pr-requisitos
+### Pre-requisitos
 
-- [Docker](https://docs.docker.com/get-docker/) instalado (verso 20+)
-- [Docker Compose](https://docs.docker.com/compose/install/) instalado (verso 2+)
+- [Docker](https://docs.docker.com/get-docker/) instalado (versao 20+)
+- [Docker Compose](https://docs.docker.com/compose/install/) instalado (versao 2+)
 - Git instalado
-- Porta **8080** disponvel na mquina
+- Porta **8080** disponivel na maquina
 
 ### Passo a passo
 
-#### 1. Clone o repositrio
+#### 1. Clone o repositorio
 
 ```bash
 git clone https://github.com/ProcopioGuedes/testlink-code-venko.git
 cd testlink-code-venko
 ```
 
-#### 2. Crie os diretrios de dados persistentes
+#### 2. Crie os diretorios de dados persistentes
 
 ```bash
 sudo mkdir -p /srv/testlink/config_db
@@ -53,11 +53,11 @@ sudo mkdir -p /srv/testlink/templates_c
 docker compose up -d --build
 ```
 
-O processo ir:
+O processo ira:
 - Construir a imagem do TestLink a partir do `Dockerfile`
 - Subir o banco de dados MariaDB
-- Subir a aplicao TestLink na porta 8080
-- Subir o servio de backup automtico do banco
+- Subir a aplicacao TestLink na porta 8080
+- Subir o servico de backup automatico do banco
 
 > **Aguarde cerca de 30-60 segundos** para o banco de dados inicializar antes de acessar.
 
@@ -69,11 +69,11 @@ Abra o navegador e acesse:
 http://<IP-DA-MAQUINA>:8080
 ```
 
-Na primeira vez, o TestLink ir mostrar a tela de **instalao/configurao inicial**.
+Na primeira vez, o TestLink ira mostrar a tela de **instalacao/configuracao inicial**.
 
 #### 5. Configure o banco de dados na tela de setup
 
-Na tela de instalao do TestLink, use as seguintes credenciais:
+Na tela de instalacao do TestLink, use as seguintes credenciais:
 
 | Campo          | Valor      |
 |----------------|------------|
@@ -83,40 +83,40 @@ Na tela de instalao do TestLink, use as seguintes credenciais:
 | Database User  | `root`     |
 | Database Pass  | `root123`  |
 
-Clique em **"Process TestLink Setup"** e aguarde a criao das tabelas.
+Clique em **"Process TestLink Setup"** e aguarde a criacao das tabelas.
 
 #### 6. Login inicial
 
-Aps o setup, acesse com:
+Apos o setup, acesse com:
 
 | Campo    | Valor    |
 |----------|----------|
-| Usurio  | `admin`  |
+| Usuario  | `admin`  |
 | Senha    | `admin`  |
 
-> ** Troque a senha do admin imediatamente aps o primeiro acesso!**
+> **Troque a senha do admin imediatamente apos o primeiro acesso/root/testlink-venko/README.md && head -5 /root/testlink-venko/README.md | cat -v*
 
 ### Estrutura de dados persistentes
 
-Os dados ficam em `/srv/testlink/` na mquina host:
+Os dados ficam em `/srv/testlink/` na maquina host:
 
 ```
 /srv/testlink/
- config_db/         # Configuraes do banco
- config_db_inc.php  # Arquivo de configurao gerado no setup
- custom/            # Personalizaes (logo, CSS, etc.)
- logs/              # Logs da aplicao
- templates_c/       # Cache de templates Smarty
- upload_area/       # Arquivos enviados pelos usurios
+|-- config_db/         # Configuracoes do banco
+|-- config_db_inc.php  # Arquivo de configuracao gerado no setup
+|-- custom/            # Personalizacoes (logo, CSS, etc.)
+|-- logs/              # Logs da aplicacao
+|-- templates_c/       # Cache de templates Smarty
+|-- upload_area/       # Arquivos enviados pelos usuarios
 ```
 
-### Comandos teis
+### Comandos uteis
 
 ```bash
 # Ver status dos containers
 docker compose ps
 
-# Ver logs da aplicao
+# Ver logs da aplicacao
 docker compose logs -f testlink
 
 # Parar os containers
@@ -125,20 +125,20 @@ docker compose down
 # Parar e remover volumes (APAGA OS DADOS DO BANCO)
 docker compose down -v
 
-# Reiniciar apenas a aplicao
+# Reiniciar apenas a aplicacao
 docker compose restart testlink
 
-# Acessar o terminal da aplicao
+# Acessar o terminal da aplicacao
 docker exec -it testlink_app bash
 
 # Acessar o banco de dados
 docker exec -it testlink_db mysql -uroot -proot123 testlink
 ```
 
-### Backup automtico
+### Backup automatico
 
-O servio `db_backup` faz backup automtico do banco de dados a cada 2 horas.
-Os backups ficam no volume `backup_data` e so mantidos por 7 dias.
+O servico `db_backup` faz backup automatico do banco de dados a cada 2 horas.
+Os backups ficam no volume `backup_data` e sao mantidos por 7 dias.
 
 Para fazer um backup manual:
 
@@ -148,48 +148,48 @@ docker exec testlink_db mysqldump -uroot -proot123 testlink | gzip > backup_manu
 
 ### Troubleshooting
 
-**Problema:** Pgina em branco ou erro 500 ao acessar  
-**Soluo:** Aguarde mais tempo para o banco subir, ou verifique os logs: `docker compose logs db`
+**Problema:** Pagina em branco ou erro 500 ao acessar
+**Solucao:** Aguarde mais tempo para o banco subir, ou verifique os logs: `docker compose logs db`
 
-**Problema:** "Could not connect to database"  
-**Soluo:** Verifique se o container do banco est saudvel: `docker compose ps`
+**Problema:** "Could not connect to database"
+**Solucao:** Verifique se o container do banco esta saudavel: `docker compose ps`
 
-**Problema:** Permisso negada nos diretrios `/srv/testlink/`  
-**Soluo:** `sudo chmod -R 777 /srv/testlink/`
+**Problema:** Permissao negada nos diretorios `/srv/testlink/`
+**Solucao:** `sudo chmod -R 777 /srv/testlink/`
 
 ---
 
-## 2. Introduo
+## 2. Introducao
 
-TestLink  um sistema web de gerenciamento de testes e execuo de testes.
+TestLink e um sistema web de gerenciamento de testes e execucao de testes.
 Permite que equipes de qualidade criem e gerenciem requisitos e casos de teste,
 organizem-nos em planos de teste e executem os testes rastreando os resultados dinamicamente.
 
-TestLink  um projeto open source licenciado sob GPL. Todo o cdigo-fonte est
-disponvel gratuitamente via [GitHub](https://github.com/TestLinkOpenSourceTRMS/testlink-code).
+TestLink e um projeto open source licenciado sob GPL. Todo o codigo-fonte esta
+disponivel gratuitamente via [GitHub](https://github.com/TestLinkOpenSourceTRMS/testlink-code).
 
 ---
 
-## 3. Notas de Release / Configuraes Crticas
+## 3. Notas de Release / Configuracoes Criticas
 
-Consulte o arquivo `CHANGELOG` para notas detalhadas de cada verso.
+Consulte o arquivo `CHANGELOG` para notas detalhadas de cada versao.
 
 ---
 
 ## 4. Requisitos do Sistema
 
-Para a verso Docker deste fork (testlink-venko):
+Para a versao Docker deste fork (testlink-venko):
 
 - Docker 20+
 - Docker Compose 2+
-- 1GB RAM mnimo (2GB recomendado)
-- 5GB de espao em disco
+- 1GB RAM minimo (2GB recomendado)
+- 5GB de espaco em disco
 
 ---
 
-## 5. Upgrade e Migrao
+## 5. Upgrade e Migracao
 
-Para atualizar para uma nova verso do testlink-venko:
+Para atualizar para uma nova versao do testlink-venko:
 
 ```bash
 git pull origin testlink_1_9_20_fixed
@@ -208,7 +208,7 @@ Fork customizado pela equipe Venko.
 
 ## 7. Bugs, Reports e Feedback
 
-Para problemas relacionados s customizaes Venko, abra uma issue em:
+Para problemas relacionados as customizacoes Venko, abra uma issue em:
 https://github.com/ProcopioGuedes/testlink-code-venko/issues
 
 Para problemas do TestLink original:
@@ -216,8 +216,8 @@ https://github.com/TestLinkOpenSourceTRMS/testlink-code/issues
 
 ---
 
-## 8. Mudanas
+## 8. Mudancas
 
-Consulte o arquivo `CHANGELOG` para o histrico completo de mudanas do TestLink original.
+Consulte o arquivo `CHANGELOG` para o historico completo de mudancas do TestLink original.
 
-Para mudanas especficas da verso Venko, consulte os commits deste repositrio.
+Para mudancas especificas da versao Venko, consulte os commits deste repositorio.
