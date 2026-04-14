@@ -1,0 +1,14 @@
+# Logs e dados temporarios
+logs/
+gui/templates_c/
+upload_area/
+config_db/
+config_db_inc.php
+*.log
+
+# Docker
+.env
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db

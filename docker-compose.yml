@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:10.6
+    container_name: testlink_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: testlink
+      MYSQL_USER: testlink
+      MYSQL_PASSWORD: testlink123
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  testlink:
+    build: .
+    container_name: testlink_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - /srv/testlink/upload_area:/var/www/html/upload_area
+      - /srv/testlink/logs:/var/www/html/logs
+      - /srv/testlink/custom:/var/www/html/custom
+      - /srv/testlink/config_db:/var/www/html/config_db
+      - /srv/testlink/templates_c:/var/www/html/gui/templates_c
+      - /srv/testlink/config_db.inc.php:/var/www/html/config_db.inc.php
+  db_backup:
+    image: alpine:3.19
+    container_name: testlink_backup
+    restart: unless-stopped
+    depends_on:
+      - db
+    volumes:
+      - backup_data:/backups
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root123
+      MYSQL_DATABASE: testlink
+    entrypoint: >
+      sh -c "
+      apk add --no-cache mariadb-client tzdata &&
+      echo '0 2 * * * mysqldump -h $$MYSQL_HOST -u $$MYSQL_USER -p$$MYSQL_PASSWORD $$MYSQL_DATABASE | gzip > /backups/testlink_$$(date +\%F_\%H-\%M-\%S).sql.gz && find /backups -type f -mtime +7 -delete' > /etc/crontabs/root &&
+      crond -f -l 8
+      "
+
+volumes:
+  db_data:
+  logs_data:
+  upload_data:
+  backup_data:
