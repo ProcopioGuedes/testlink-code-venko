@@ -335,6 +335,7 @@ $TLS_test_status_not_run = "Não Executado";
 $TLS_test_status_blocked = "Bloqueado";
 $TLS_test_status_failed = "Com Falha";
 $TLS_test_status_passed = "Passou";
+$TLS_test_status_passed_with_conditions = "Passou com Ressalvas";
 $TLS_test_status_not_available = "Não disponível";
 $TLS_test_status_unknown = "desconhecido";
 
