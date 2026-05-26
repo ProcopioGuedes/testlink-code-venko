@@ -7,6 +7,7 @@
 #   ./sync-to-container.sh meu_app              # outro nome para o container do app
 #   ./sync-to-container.sh meu_app meu_db       # outros nomes para app e db
 #   FORCE_BROKEN=1 ./sync-to-container.sh       # ignora pre-flight (use so se souber o que faz)
+#   NO_AUTO_SCHEMA=1 ./sync-to-container.sh     # desativa auto-carga do schema quando o DB esta vazio
 
 set -euo pipefail
 
@@ -16,6 +17,14 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_DIR="/var/www/html"
 APP_URL="${APP_URL:-http://localhost:8080/login.php}"
 FORCE_BROKEN="${FORCE_BROKEN:-0}"
+NO_AUTO_SCHEMA="${NO_AUTO_SCHEMA:-0}"
+
+# Credenciais lidas de config_db.inc.php no app container. Preenchidas por
+# read_db_creds() e reusadas tanto pela checagem quanto pela auto-recuperacao.
+DB_USER=""
+DB_PASS=""
+DB_NAME=""
+DB_HOST=""
 
 err() { echo "$@" >&2; }
 
@@ -34,6 +43,22 @@ fi
 # corrompido.
 # ============================================================================
 
+read_db_creds() {
+  # Le credenciais do config_db.inc.php dentro do container do app (e o que
+  # o codigo PHP realmente usa). Fallback para os defaults do compose se nao
+  # conseguir parsear. Idempotente - pode ser chamada varias vezes.
+  local cfg
+  cfg=$(docker exec "$CONTAINER" cat /var/www/html/config_db.inc.php 2>/dev/null || echo "")
+  DB_USER=$(echo "$cfg" | sed -n "s/.*DB_USER'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
+  DB_PASS=$(echo "$cfg" | sed -n "s/.*DB_PASS'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
+  DB_NAME=$(echo "$cfg" | sed -n "s/.*DB_NAME'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
+  DB_HOST=$(echo "$cfg" | sed -n "s/.*DB_HOST'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
+  [ -z "$DB_USER" ] && DB_USER="root"
+  [ -z "$DB_PASS" ] && DB_PASS="root123"
+  [ -z "$DB_NAME" ] && DB_NAME="testlink"
+  [ -z "$DB_HOST" ] && DB_HOST="db"
+}
+
 check_db_schema() {
   # Retorna 0 se o DB tem o schema do TestLink (tabela db_version existe),
   # 1 se o DB esta vazio ou inacessivel. Silenciosa - quem chama decide o que
@@ -41,25 +66,38 @@ check_db_schema() {
   if ! docker ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
     return 2  # container de DB nem existe, nao da pra checar
   fi
-  # Le credenciais do config_db.inc.php dentro do container do app (e o que
-  # o codigo PHP realmente usa). Fallback para variaveis do compose se nao
-  # conseguir parsear.
-  local cfg user pass db host
-  cfg=$(docker exec "$CONTAINER" cat /var/www/html/config_db.inc.php 2>/dev/null || echo "")
-  user=$(echo "$cfg" | sed -n "s/.*DB_USER'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
-  pass=$(echo "$cfg" | sed -n "s/.*DB_PASS'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
-  db=$(echo   "$cfg" | sed -n "s/.*DB_NAME'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
-  host=$(echo "$cfg" | sed -n "s/.*DB_HOST'[^,]*,[[:space:]]*'\([^']*\)'.*/\1/p" | head -1)
-  [ -z "$user" ] && user="root"
-  [ -z "$pass" ] && pass="root123"
-  [ -z "$db" ]   && db="testlink"
-  [ -z "$host" ] && host="db"
-
+  read_db_creds
   local tables
   tables=$(docker exec "$DB_CONTAINER" sh -c \
-    "mysql -h'$host' -u'$user' -p'$pass' '$db' -N -B -e 'SHOW TABLES LIKE \"db_version\";' 2>/dev/null" \
+    "mysql -h'$DB_HOST' -u'$DB_USER' -p'$DB_PASS' '$DB_NAME' -N -B -e 'SHOW TABLES LIKE \"db_version\";' 2>/dev/null" \
     | tr -d '[:space:]')
   [ "$tables" = "db_version" ]
+}
+
+auto_load_schema() {
+  # Carrega o schema padrao do TestLink no DB e insere os dados default
+  # (perfis, admin etc.). Equivalente ao "passo 2" das instrucoes manuais
+  # de recuperacao, mas reusando as credenciais ja parseadas do config.
+  local tables_sql="$SRC_DIR/install/sql/mysql/testlink_create_tables.sql"
+  local data_sql="$SRC_DIR/install/sql/mysql/testlink_create_default_data.sql"
+  if [ ! -f "$tables_sql" ] || [ ! -f "$data_sql" ]; then
+    err "    [erro] SQLs nao encontrados em $SRC_DIR/install/sql/mysql/"
+    return 1
+  fi
+  read_db_creds
+  echo "    -> criando tabelas em '$DB_NAME' a partir de testlink_create_tables.sql"
+  if ! docker exec -i "$DB_CONTAINER" \
+        mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$tables_sql" 2> >(sed 's/^/        /' >&2); then
+    err "    [erro] falha ao executar testlink_create_tables.sql"
+    return 1
+  fi
+  echo "    -> inserindo dados default a partir de testlink_create_default_data.sql"
+  if ! docker exec -i "$DB_CONTAINER" \
+        mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$data_sql" 2> >(sed 's/^/        /' >&2); then
+    err "    [erro] falha ao executar testlink_create_default_data.sql"
+    return 1
+  fi
+  return 0
 }
 
 check_http_health() {
@@ -89,6 +127,31 @@ case "$(check_http_health && echo ok || echo $?)" in
   *)  echo "    [aviso] nao consegui alcancar $APP_URL, pulando checagem HTTP"; http_ok=0 ;;
 esac
 
+# ----------------------------------------------------------------------------
+# Auto-recuperacao: se o DB esta sem o schema do TestLink, em vez de abortar
+# e pedir que o usuario rode os SQLs na mao, carregamos automaticamente os
+# scripts oficiais do install/. Depois reavaliamos o estado e seguimos com o
+# sync se ficou bom. NO_AUTO_SCHEMA=1 desativa esse comportamento (volta a
+# abortar como antes); FORCE_BROKEN=1 ignora tudo e empurra o sync mesmo
+# assim (so use se estiver preparando codigo antes de rodar o instalador).
+# ----------------------------------------------------------------------------
+if [ "$db_ok" = "2" ] && [ "$NO_AUTO_SCHEMA" != "1" ] && [ "$FORCE_BROKEN" != "1" ]; then
+  echo ""
+  echo "==> Auto-recuperacao: DB sem schema, tentando carregar automaticamente"
+  if auto_load_schema && check_db_schema; then
+    echo "    [ok] schema carregado e tabela db_version presente"
+    db_ok=1
+    # O HTTP pode ter destravado agora que o DB tem schema - reavalia.
+    case "$(check_http_health && echo ok || echo $?)" in
+      ok) echo "    [ok] $APP_URL agora responde sem DB Access Error"; http_ok=1 ;;
+      1)  err "    [QUEBRADO] $APP_URL ainda serve backtrace apos a carga"; http_ok=2 ;;
+      *)  echo "    [aviso] nao consegui alcancar $APP_URL apos a carga"; http_ok=0 ;;
+    esac
+  else
+    err "    [erro] auto-recuperacao falhou - schema continua ausente"
+  fi
+fi
+
 if [ "$db_ok" = "2" ] || [ "$http_ok" = "2" ]; then
   err ""
   err "================================================================"
@@ -100,6 +163,10 @@ if [ "$db_ok" = "2" ] || [ "$http_ok" = "2" ]; then
   err "  - o volume 'db_data' foi removido manualmente"
   err "  - o banco nunca foi inicializado pelo instalador"
   err ""
+  if [ "$NO_AUTO_SCHEMA" = "1" ]; then
+    err "NO_AUTO_SCHEMA=1 esta setado - a auto-recuperacao foi pulada."
+    err ""
+  fi
   err "Como recuperar:"
   err "  1) Abra http://localhost:8080/install/index.php no navegador e"
   err "     siga o instalador para recriar o schema, OU"
