@@ -45,7 +45,12 @@ sudo mkdir -p /srv/testlink/logs
 sudo mkdir -p /srv/testlink/upload_area
 sudo mkdir -p /srv/testlink/custom
 sudo mkdir -p /srv/testlink/templates_c
+sudo touch /srv/testlink/config_db.inc.php
+sudo chmod 664 /srv/testlink/config_db.inc.php
 ```
+
+> O arquivo `config_db.inc.php` precisa existir no host **antes** de subir o container.
+> Se ele nao existir, o Docker cria um diretorio no lugar, impedindo o instalador de gravar a configuracao do banco.
 
 #### 3. Suba os containers
 
@@ -61,7 +66,17 @@ O processo ira:
 
 > **Aguarde cerca de 30-60 segundos** para o banco de dados inicializar antes de acessar.
 
-#### 4. Acesse o TestLink
+#### 4. Sincronize as customizacoes Venko para dentro do container
+
+```bash
+./sync-to-container.sh
+```
+
+Este script copia os arquivos customizados da Venko (locales, custom_config, views, etc.) para dentro do container, preservando os bind-mounts de dados (`upload_area`, `logs`, `custom`, `config_db`, `templates_c`, `config_db.inc.php`). Ele tambem valida sintaxe PHP dos arquivos criticos antes de empurrar.
+
+> Este passo e **obrigatorio** apos `docker compose up -d --build` e antes do primeiro acesso, caso contrario customizacoes como o status `passed_with_conditions` aparecerao como `LOCALIZE: <chave>` na interface.
+
+#### 5. Acesse o TestLink
 
 Abra o navegador e acesse:
 
@@ -71,7 +86,7 @@ http://<IP-DA-MAQUINA>:8080
 
 Na primeira vez, o TestLink ira mostrar a tela de **instalacao/configuracao inicial**.
 
-#### 5. Configure o banco de dados na tela de setup
+#### 6. Configure o banco de dados na tela de setup
 
 Na tela de instalacao do TestLink, use as seguintes credenciais:
 
@@ -80,12 +95,14 @@ Na tela de instalacao do TestLink, use as seguintes credenciais:
 | Database Type  | MySQL      |
 | Database Host  | `db`       |
 | Database Name  | `testlink` |
+| Admin User     | `root`     |
+| Admin Password | `root123`  |
 | Database User  | `root`     |
 | Database Pass  | `root123`  |
 
 Clique em **"Process TestLink Setup"** e aguarde a criacao das tabelas.
 
-#### 6. Login inicial
+#### 7. Login inicial
 
 Apos o setup, acesse com:
 
@@ -94,7 +111,7 @@ Apos o setup, acesse com:
 | Usuario  | `admin`  |
 | Senha    | `admin`  |
 
-> **Troque a senha do admin imediatamente apos o primeiro acesso/root/testlink-venko/README.md && head -5 /root/testlink-venko/README.md | cat -v*
+> **Troque a senha do admin imediatamente apos o primeiro acesso.**
 
 ### Estrutura de dados persistentes
 
@@ -103,7 +120,7 @@ Os dados ficam em `/srv/testlink/` na maquina host:
 ```
 /srv/testlink/
 |-- config_db/         # Configuracoes do banco
-|-- config_db_inc.php  # Arquivo de configuracao gerado no setup
+|-- config_db.inc.php  # Arquivo de configuracao gerado no setup
 |-- custom/            # Personalizacoes (logo, CSS, etc.)
 |-- logs/              # Logs da aplicacao
 |-- templates_c/       # Cache de templates Smarty
@@ -156,6 +173,16 @@ docker exec testlink_db mysqldump -uroot -proot123 testlink | gzip > backup_manu
 
 **Problema:** Permissao negada nos diretorios `/srv/testlink/`
 **Solucao:** `sudo chmod -R 777 /srv/testlink/`
+
+**Problema:** "TestLink couldn't write the config file" durante a instalacao
+**Solucao:** O arquivo `config_db.inc.php` nao foi pre-criado no host antes de subir o container. Crie-o manualmente com o conteudo exibido na tela de erro:
+```bash
+sudo touch /srv/testlink/config_db.inc.php
+sudo chmod 664 /srv/testlink/config_db.inc.php
+# Cole o conteudo PHP exibido na tela de erro e reinicie:
+docker compose restart testlink
+```
+Em instalacoes novas, isso e evitado automaticamente pelo `docker-entrypoint.sh` a partir desta versao.
 
 ---
 
